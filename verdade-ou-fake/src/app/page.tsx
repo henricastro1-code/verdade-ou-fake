@@ -306,17 +306,17 @@ export default function Home() {
               <button
                 type="submit"
                 disabled={isLoading || (!text.trim() && !image)}
-                className="w-full py-4 px-6 bg-gradient-to-r from-navy-800 to-navy-900 hover:from-navy-700 hover:to-navy-800 text-white font-semibold rounded-xl shadow-lg shadow-navy-900/20 disabled:opacity-50 disabled:cursor-not-allowed transition-all flex items-center justify-center gap-3"
+                className="w-full py-4 px-6 bg-slate-800 hover:bg-slate-700 text-white font-semibold rounded-xl shadow-lg shadow-slate-900/20 disabled:opacity-50 disabled:cursor-not-allowed transition-all flex items-center justify-center gap-3"
               >
                 {isLoading ? (
                   <>
                     <Loader2 className="w-5 h-5 animate-spin" />
-                    Analisando...
+                    <span>Analisando...</span>
                   </>
                 ) : (
                   <>
                     <Search className="w-5 h-5" />
-                    Verificar Fato
+                    <span>Verificar Fato</span>
                   </>
                 )}
               </button>
@@ -333,40 +333,38 @@ export default function Home() {
             <div className="space-y-6 animate-slide-up">
               {/* Verdict Card */}
               <div className="bg-white rounded-2xl shadow-lg shadow-slate-200/50 border border-slate-200 overflow-hidden">
-                {/* Verdict Badge */}
-                <div className="p-6 border-b border-slate-100">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-4">
-                      {(() => {
-                        const config = veredictoConfig[result.veredito]
-                        const Icon = config.icon
-                        return (
-                          <>
-                            <div className={`w-14 h-14 rounded-2xl ${config.className} flex items-center justify-center`}>
-                              <Icon className="w-7 h-7 text-white" />
-                            </div>
-                            <div>
-                              <span className="text-sm font-medium text-slate-500 block">
-                                Veredito
-                              </span>
-                              <span className={`text-2xl font-bold ${config.textColor}`}>
-                                {config.label}
-                              </span>
-                            </div>
-                          </>
-                        )
-                      })()}
+                {/* Verdict Badge - Full color header */}
+                {(() => {
+                  const config = veredictoConfig[result.veredito]
+                  const Icon = config.icon
+                  return (
+                    <div className={`p-6 ${config.className}`}>
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-4">
+                          <div className="w-14 h-14 rounded-2xl bg-white/20 flex items-center justify-center">
+                            <Icon className="w-7 h-7 text-white" />
+                          </div>
+                          <div>
+                            <span className="text-sm font-medium text-white/80 block">
+                              Veredito
+                            </span>
+                            <span className="text-2xl font-bold text-white">
+                              {config.label}
+                            </span>
+                          </div>
+                        </div>
+                        
+                        {/* Confidence */}
+                        <div className="text-right">
+                          <span className="text-sm text-white/80 block">Confiança</span>
+                          <span className="text-2xl font-bold text-white">
+                            {result.confianca}%
+                          </span>
+                        </div>
+                      </div>
                     </div>
-                    
-                    {/* Confidence */}
-                    <div className="text-right">
-                      <span className="text-sm text-slate-500 block">Confiança</span>
-                      <span className="text-2xl font-bold text-navy-800">
-                        {result.confianca}%
-                      </span>
-                    </div>
-                  </div>
-                </div>
+                  )
+                })()}
 
                 {/* Summary */}
                 <div className="p-6 border-b border-slate-100">
