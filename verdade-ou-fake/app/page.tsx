@@ -4,110 +4,88 @@ import { useState, useRef, useCallback } from 'react'
 import { 
   Search, 
   Upload, 
-  AlertTriangle, 
+  X, 
   CheckCircle2, 
   XCircle, 
+  AlertTriangle, 
   HelpCircle,
   Loader2,
-  Link as LinkIcon,
-  FileText,
-  Image as ImageIcon,
-  X,
   Shield,
-  Sparkles,
-  ArrowRight,
+  Link2,
+  Image as ImageIcon,
+  FileText,
   ExternalLink,
-  Info
+  Lightbulb,
+  Scale
 } from 'lucide-react'
 
-type VerdictType = 'VERDADEIRO' | 'FALSO' | 'ENGANOSO' | 'SEM_EVIDENCIAS' | null
+type Veredito = 'VERDADEIRO' | 'FALSO' | 'ENGANOSO' | 'SEM_EVIDENCIAS'
 
 interface VerificationResult {
-  verdict: VerdictType
-  confidence: number
-  summary: string
-  explanation: string
-  context?: string
-  sources?: string[]
-  tips?: string[]
+  veredito: Veredito
+  confianca: number
+  resumo: string
+  analise: string
+  fontes_consultadas: string[]
+  dicas: string
+  contexto_juridico: string | null
+  modo_demo?: boolean
+  error?: string
 }
 
-const verdictConfig = {
+const veredictoConfig = {
   VERDADEIRO: {
     icon: CheckCircle2,
-    color: 'bg-emerald-500',
+    label: 'Verdadeiro',
+    bgColor: '#059669',
     textColor: 'text-emerald-700',
     bgLight: 'bg-emerald-50',
     borderColor: 'border-emerald-200',
-    label: 'Verdadeiro',
-    description: 'A informação é factualmente correta'
   },
   FALSO: {
     icon: XCircle,
-    color: 'bg-red-500',
+    label: 'Falso',
+    bgColor: '#dc2626',
     textColor: 'text-red-700',
     bgLight: 'bg-red-50',
     borderColor: 'border-red-200',
-    label: 'Falso',
-    description: 'A informação é factualmente incorreta'
   },
   ENGANOSO: {
     icon: AlertTriangle,
-    color: 'bg-amber-500',
+    label: 'Enganoso',
+    bgColor: '#d97706',
     textColor: 'text-amber-700',
     bgLight: 'bg-amber-50',
     borderColor: 'border-amber-200',
-    label: 'Enganoso',
-    description: 'Contém elementos verdadeiros mas distorce a realidade'
   },
   SEM_EVIDENCIAS: {
     icon: HelpCircle,
-    color: 'bg-slate-500',
-    textColor: 'text-slate-700',
-    bgLight: 'bg-slate-50',
-    borderColor: 'border-slate-200',
     label: 'Sem Evidências',
-    description: 'Não há informações suficientes para verificar'
-  }
+    bgColor: '#6b7280',
+    textColor: 'text-gray-700',
+    bgLight: 'bg-gray-50',
+    borderColor: 'border-gray-200',
+  },
 }
 
-export default function HomePage() {
-  const [inputText, setInputText] = useState('')
-  const [imageFile, setImageFile] = useState<File | null>(null)
+export default function Home() {
+  const [text, setText] = useState('')
+  const [image, setImage] = useState<File | null>(null)
   const [imagePreview, setImagePreview] = useState<string | null>(null)
-  const [isAnalyzing, setIsAnalyzing] = useState(false)
+  const [isLoading, setIsLoading] = useState(false)
   const [result, setResult] = useState<VerificationResult | null>(null)
   const [error, setError] = useState<string | null>(null)
-  const [inputType, setInputType] = useState<'text' | 'url' | 'image'>('text')
   
   const fileInputRef = useRef<HTMLInputElement>(null)
-  const resultRef = useRef<HTMLDivElement>(null)
 
-  const detectInputType = useCallback((text: string) => {
-    const urlPattern = /^(https?:\/\/)?([\da-z\.-]+)\.([a-z\.]{2,6})([\/\w \.-]*)*\/?$/i
-    if (urlPattern.test(text.trim())) {
-      setInputType('url')
-    } else {
-      setInputType('text')
-    }
-  }, [])
-
-  const handleTextChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
-    const value = e.target.value
-    setInputText(value)
-    detectInputType(value)
-    setError(null)
-  }
-
-  const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleImageChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
     if (file) {
       if (file.size > 10 * 1024 * 1024) {
-        setError('Imagem muito grande. Máximo: 10MB')
+        setError('Imagem muito grande. Máximo de 10MB.')
         return
       }
-      setImageFile(file)
-      setInputType('image')
+      setImage(file)
       const reader = new FileReader()
       reader.onloadend = () => {
         setImagePreview(reader.result as string)
@@ -115,385 +93,375 @@ export default function HomePage() {
       reader.readAsDataURL(file)
       setError(null)
     }
-  }
+  }, [])
 
-  const removeImage = () => {
-    setImageFile(null)
+  const removeImage = useCallback(() => {
+    setImage(null)
     setImagePreview(null)
-    setInputType(inputText ? 'text' : 'text')
     if (fileInputRef.current) {
       fileInputRef.current.value = ''
     }
-  }
+  }, [])
 
-  const handleVerify = async () => {
-    if (!inputText.trim() && !imageFile) {
-      setError('Cole um texto, link ou envie uma imagem para verificar')
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault()
+    
+    if (!text.trim() && !image) {
+      setError('Cole um texto, link ou envie uma imagem para verificar.')
       return
     }
 
-    setIsAnalyzing(true)
+    setIsLoading(true)
     setError(null)
     setResult(null)
 
     try {
       const formData = new FormData()
-      formData.append('text', inputText)
-      formData.append('type', inputType)
-      if (imageFile) {
-        formData.append('image', imageFile)
+      if (text.trim()) {
+        formData.append('text', text.trim())
+      }
+      if (image) {
+        formData.append('image', image)
       }
 
-      const response = await fetch('/api/verificar', {
+      const response = await fetch('/api/verify', {
         method: 'POST',
         body: formData,
       })
 
+      const data = await response.json()
+
       if (!response.ok) {
-        const errorData = await response.json()
-        throw new Error(errorData.error || 'Erro ao verificar')
+        throw new Error(data.error || 'Erro ao verificar.')
       }
 
-      const data = await response.json()
       setResult(data)
-      
-      // Scroll to result
-      setTimeout(() => {
-        resultRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
-      }, 100)
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Erro ao processar sua solicitação')
+      setError(err instanceof Error ? err.message : 'Erro ao processar sua solicitação.')
     } finally {
-      setIsAnalyzing(false)
+      setIsLoading(false)
     }
   }
 
-  const handleKeyDown = (e: React.KeyboardEvent) => {
-    if (e.key === 'Enter' && e.metaKey) {
-      handleVerify()
-    }
-  }
-
-  const clearAll = () => {
-    setInputText('')
-    setImageFile(null)
+  const resetForm = () => {
+    setText('')
+    setImage(null)
     setImagePreview(null)
     setResult(null)
     setError(null)
-    setInputType('text')
   }
 
+  const detectInputType = (value: string): 'url' | 'text' | null => {
+    if (!value.trim()) return null
+    try {
+      new URL(value.trim())
+      return 'url'
+    } catch {
+      return 'text'
+    }
+  }
+
+  const inputType = detectInputType(text)
+
   return (
-    <main className="min-h-screen noise-bg">
+    <main className="min-h-screen flex flex-col">
       {/* Header */}
-      <header className="relative z-10 pt-8 pb-4 px-4">
-        <div className="max-w-3xl mx-auto text-center">
-          <div className="inline-flex items-center gap-2 px-4 py-1.5 bg-trust-800/5 rounded-full text-trust-700 text-sm font-medium mb-6">
-            <Shield className="w-4 h-4" />
-            <span>Ferramenta anti-desinformação</span>
+      <header className="w-full py-4 px-6 border-b border-slate-200 bg-white/80 backdrop-blur-sm">
+        <div className="max-w-4xl mx-auto flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-navy-800 to-navy-900 flex items-center justify-center shadow-lg">
+              <Shield className="w-5 h-5 text-white" />
+            </div>
+            <div>
+              <h1 className="text-xl font-bold text-navy-900 tracking-tight">
+                Verdade ou Fake?
+              </h1>
+              <p className="text-xs text-slate-500">Verificador de Fatos</p>
+            </div>
           </div>
-          
-          <h1 className="font-display text-5xl md:text-6xl lg:text-7xl text-trust-900 mb-4 tracking-tight">
-            Verdade <span className="italic text-trust-600">ou</span> Fake<span className="text-trust-400">?</span>
-          </h1>
-          
-          <p className="text-trust-600 text-lg md:text-xl max-w-xl mx-auto leading-relaxed">
-            Cole aquele texto suspeito, link duvidoso ou print de WhatsApp. 
-            <span className="font-medium text-trust-700"> Vamos verificar juntos.</span>
-          </p>
+          <span className="text-xs text-slate-400 hidden sm:block">
+            Ferramenta anti-desinformação
+          </span>
         </div>
       </header>
 
       {/* Main Content */}
-      <section className="relative z-10 px-4 pb-16">
-        <div className="max-w-2xl mx-auto">
-          {/* Input Card */}
-          <div className="bg-white rounded-2xl shadow-xl shadow-trust-900/5 border border-trust-100 overflow-hidden">
-            {/* Input Type Indicator */}
-            <div className="flex items-center gap-2 px-5 py-3 bg-trust-50 border-b border-trust-100">
-              {inputType === 'url' && (
-                <>
-                  <LinkIcon className="w-4 h-4 text-trust-500" />
-                  <span className="text-sm text-trust-600 font-medium">Link detectado</span>
-                </>
-              )}
-              {inputType === 'text' && !imageFile && (
-                <>
-                  <FileText className="w-4 h-4 text-trust-500" />
-                  <span className="text-sm text-trust-600 font-medium">Texto para análise</span>
-                </>
-              )}
-              {inputType === 'image' && (
-                <>
-                  <ImageIcon className="w-4 h-4 text-trust-500" />
-                  <span className="text-sm text-trust-600 font-medium">Imagem para análise</span>
-                </>
-              )}
+      <div className="flex-1 flex flex-col items-center justify-center px-4 py-8 sm:py-12">
+        <div className="w-full max-w-2xl">
+          {/* Hero Section */}
+          {!result && (
+            <div className="text-center mb-8 animate-fade-in">
+              <h2 className="text-3xl sm:text-4xl font-bold text-navy-900 mb-3">
+                Verifique antes de compartilhar
+              </h2>
+              <p className="text-slate-600 text-lg">
+                Cole o texto, link ou envie um print da notícia suspeita
+              </p>
             </div>
+          )}
 
-            {/* Text Input */}
-            <div className="p-5">
-              <textarea
-                value={inputText}
-                onChange={handleTextChange}
-                onKeyDown={handleKeyDown}
-                placeholder="Cole aqui o texto, notícia ou link que você quer verificar..."
-                className="w-full h-40 text-trust-800 placeholder:text-trust-400 text-lg leading-relaxed focus:outline-none resize-none"
-                disabled={isAnalyzing}
-              />
-            </div>
-
-            {/* Image Preview */}
-            {imagePreview && (
-              <div className="px-5 pb-4">
-                <div className="relative inline-block">
-                  <img 
-                    src={imagePreview} 
-                    alt="Preview" 
-                    className="max-h-48 rounded-lg border border-trust-200 shadow-sm"
+          {/* Input Form */}
+          {!result && (
+            <form onSubmit={handleSubmit} className="space-y-4 animate-slide-up">
+              {/* Main Input Card */}
+              <div className="bg-white rounded-2xl shadow-lg shadow-slate-200/50 border border-slate-200 overflow-hidden">
+                {/* Text Input */}
+                <div className="relative">
+                  <textarea
+                    value={text}
+                    onChange={(e) => {
+                      setText(e.target.value)
+                      setError(null)
+                    }}
+                    placeholder="Cole aqui o texto, link ou corrente de WhatsApp..."
+                    className="w-full min-h-[160px] p-5 text-lg text-navy-800 placeholder:text-slate-400 resize-none border-0 focus:ring-0"
+                    disabled={isLoading}
                   />
-                  <button
-                    onClick={removeImage}
-                    className="absolute -top-2 -right-2 p-1 bg-trust-800 text-white rounded-full hover:bg-trust-700 transition-colors"
-                    aria-label="Remover imagem"
-                  >
-                    <X className="w-4 h-4" />
-                  </button>
+                  
+                  {/* Input Type Indicator */}
+                  {inputType && (
+                    <div className="absolute top-4 right-4">
+                      <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium ${
+                        inputType === 'url' 
+                          ? 'bg-blue-100 text-blue-700' 
+                          : 'bg-slate-100 text-slate-600'
+                      }`}>
+                        {inputType === 'url' ? (
+                          <>
+                            <Link2 className="w-3 h-3" />
+                            Link detectado
+                          </>
+                        ) : (
+                          <>
+                            <FileText className="w-3 h-3" />
+                            Texto
+                          </>
+                        )}
+                      </span>
+                    </div>
+                  )}
+                </div>
+
+                {/* Divider with OR */}
+                <div className="relative px-5">
+                  <div className="absolute inset-0 flex items-center px-5">
+                    <div className="w-full border-t border-slate-200" />
+                  </div>
+                  <div className="relative flex justify-center">
+                    <span className="bg-white px-3 text-sm text-slate-400">ou</span>
+                  </div>
+                </div>
+
+                {/* Image Upload Area */}
+                <div className="p-5">
+                  {imagePreview ? (
+                    <div className="relative image-preview">
+                      <img 
+                        src={imagePreview} 
+                        alt="Preview" 
+                        className="w-full max-h-64 object-contain rounded-lg"
+                      />
+                      <button
+                        type="button"
+                        onClick={removeImage}
+                        className="absolute top-2 right-2 p-1.5 bg-white/90 hover:bg-white rounded-full shadow-md transition-all"
+                        disabled={isLoading}
+                      >
+                        <X className="w-4 h-4 text-slate-600" />
+                      </button>
+                    </div>
+                  ) : (
+                    <label className="flex flex-col items-center justify-center py-8 border-2 border-dashed border-slate-200 rounded-xl cursor-pointer hover:border-navy-300 hover:bg-slate-50/50 transition-all group">
+                      <input
+                        ref={fileInputRef}
+                        type="file"
+                        accept="image/*"
+                        onChange={handleImageChange}
+                        className="hidden"
+                        disabled={isLoading}
+                      />
+                      <div className="w-12 h-12 rounded-full bg-slate-100 flex items-center justify-center mb-3 group-hover:bg-navy-100 transition-colors">
+                        <ImageIcon className="w-6 h-6 text-slate-400 group-hover:text-navy-600" />
+                      </div>
+                      <span className="text-sm font-medium text-slate-600">
+                        Envie um print ou foto
+                      </span>
+                      <span className="text-xs text-slate-400 mt-1">
+                        PNG, JPG ou WebP até 10MB
+                      </span>
+                    </label>
+                  )}
                 </div>
               </div>
-            )}
 
-            {/* Actions */}
-            <div className="flex items-center justify-between px-5 py-4 bg-trust-50/50 border-t border-trust-100">
-              <div className="flex items-center gap-2">
-                <input
-                  ref={fileInputRef}
-                  type="file"
-                  accept="image/*"
-                  onChange={handleImageUpload}
-                  className="hidden"
-                  id="image-upload"
-                />
-                <label
-                  htmlFor="image-upload"
-                  className="flex items-center gap-2 px-4 py-2.5 text-trust-600 hover:text-trust-800 hover:bg-trust-100 rounded-xl cursor-pointer transition-all text-sm font-medium"
-                >
-                  <Upload className="w-4 h-4" />
-                  <span className="hidden sm:inline">Enviar print</span>
-                </label>
-                
-                {(inputText || imageFile) && (
-                  <button
-                    onClick={clearAll}
-                    className="px-4 py-2.5 text-trust-500 hover:text-trust-700 hover:bg-trust-100 rounded-xl transition-all text-sm font-medium"
-                  >
-                    Limpar
-                  </button>
-                )}
-              </div>
+              {/* Error Message */}
+              {error && (
+                <div className="flex items-center gap-2 p-4 bg-red-50 border border-red-200 rounded-xl text-red-700">
+                  <AlertTriangle className="w-5 h-5 flex-shrink-0" />
+                  <p className="text-sm">{error}</p>
+                </div>
+              )}
 
+              {/* Submit Button */}
               <button
-                onClick={handleVerify}
-                disabled={isAnalyzing || (!inputText.trim() && !imageFile)}
-                className="flex items-center gap-2 px-6 py-3 bg-trust-800 hover:bg-trust-900 disabled:bg-trust-300 text-white rounded-xl font-semibold transition-all disabled:cursor-not-allowed shadow-lg shadow-trust-800/20 hover:shadow-xl hover:shadow-trust-800/30"
+                type="submit"
+                disabled={isLoading || (!text.trim() && !image)}
+                className="w-full py-4 px-6 font-semibold rounded-xl shadow-lg disabled:opacity-50 disabled:cursor-not-allowed transition-all flex items-center justify-center gap-3"
+                style={{ 
+                  backgroundColor: '#1e293b', 
+                  color: 'white',
+                }}
               >
-                {isAnalyzing ? (
+                {isLoading ? (
                   <>
-                    <Loader2 className="w-5 h-5 animate-spin" />
-                    <span>Analisando...</span>
+                    <Loader2 className="w-5 h-5 animate-spin" style={{ color: 'white' }} />
+                    <span style={{ color: 'white' }}>Analisando...</span>
                   </>
                 ) : (
                   <>
-                    <Search className="w-5 h-5" />
-                    <span>Verificar</span>
+                    <Search className="w-5 h-5" style={{ color: 'white' }} />
+                    <span style={{ color: 'white' }}>Verificar Fato</span>
                   </>
                 )}
               </button>
-            </div>
-          </div>
 
-          {/* Error Message */}
-          {error && (
-            <div className="mt-4 p-4 bg-red-50 border border-red-200 rounded-xl text-red-700 flex items-start gap-3 animate-fade-in">
-              <AlertTriangle className="w-5 h-5 flex-shrink-0 mt-0.5" />
-              <p>{error}</p>
-            </div>
-          )}
-
-          {/* Loading State */}
-          {isAnalyzing && (
-            <div className="mt-8 text-center animate-fade-in">
-              <div className="relative inline-flex items-center justify-center">
-                <div className="absolute w-20 h-20 rounded-full bg-trust-200 pulse-ring" />
-                <div className="relative w-16 h-16 rounded-full bg-trust-100 flex items-center justify-center">
-                  <Sparkles className="w-8 h-8 text-trust-600 animate-pulse" />
-                </div>
-              </div>
-              <p className="mt-4 text-trust-600 font-medium">
-                Analisando conteúdo
-                <span className="loading-dots ml-1">
-                  <span className="inline-block">.</span>
-                  <span className="inline-block">.</span>
-                  <span className="inline-block">.</span>
-                </span>
+              {/* Helper text */}
+              <p className="text-center text-xs" style={{ color: '#94a3b8' }}>
+                Esta ferramenta usa IA para análise. Sempre verifique em fontes oficiais.
               </p>
-              <p className="mt-1 text-trust-400 text-sm">Verificando fontes e checando fatos</p>
-            </div>
+            </form>
           )}
 
-          {/* Result */}
-          {result && result.verdict && (
-            <div ref={resultRef} className="mt-8 verdict-card">
-              {(() => {
-                const config = verdictConfig[result.verdict]
-                const Icon = config.icon
-                
-                return (
-                  <div className={`${config.bgLight} ${config.borderColor} border rounded-2xl overflow-hidden`}>
-                    {/* Verdict Header */}
-                    <div className={`${config.color} px-6 py-5 text-white`}>
-                      <div className="flex items-center gap-4">
-                        <div className="p-3 bg-white/20 rounded-xl">
-                          <Icon className="w-8 h-8" />
-                        </div>
-                        <div>
-                          <p className="text-white/80 text-sm font-medium uppercase tracking-wide">Veredito</p>
-                          <h2 className="text-3xl font-display font-bold">{config.label}</h2>
-                        </div>
-                        {result.confidence > 0 && (
-                          <div className="ml-auto text-right">
-                            <p className="text-white/80 text-sm">Confiança</p>
-                            <p className="text-2xl font-bold">{result.confidence}%</p>
+          {/* Results */}
+          {result && (
+            <div className="space-y-6 animate-slide-up">
+              {/* Verdict Card */}
+              <div className="bg-white rounded-2xl shadow-lg shadow-slate-200/50 border border-slate-200 overflow-hidden">
+                {/* Verdict Badge - Full color header */}
+                {(() => {
+                  const config = veredictoConfig[result.veredito]
+                  const Icon = config.icon
+                  return (
+                    <div 
+                      className="p-6"
+                      style={{ backgroundColor: config.bgColor }}
+                    >
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-4">
+                          <div 
+                            className="w-14 h-14 rounded-2xl flex items-center justify-center"
+                            style={{ backgroundColor: 'rgba(255,255,255,0.2)' }}
+                          >
+                            <Icon className="w-7 h-7" style={{ color: 'white' }} />
                           </div>
-                        )}
-                      </div>
-                    </div>
-
-                    {/* Content */}
-                    <div className="p-6 space-y-5">
-                      {/* Summary */}
-                      <div>
-                        <h3 className={`text-sm font-semibold ${config.textColor} uppercase tracking-wide mb-2`}>
-                          Resumo
-                        </h3>
-                        <p className="text-trust-800 text-lg leading-relaxed">
-                          {result.summary}
-                        </p>
-                      </div>
-
-                      {/* Explanation */}
-                      <div>
-                        <h3 className={`text-sm font-semibold ${config.textColor} uppercase tracking-wide mb-2`}>
-                          Por que chegamos a esse veredito
-                        </h3>
-                        <p className="text-trust-700 leading-relaxed">
-                          {result.explanation}
-                        </p>
-                      </div>
-
-                      {/* Context */}
-                      {result.context && (
-                        <div className="p-4 bg-white rounded-xl border border-trust-200">
-                          <div className="flex items-start gap-3">
-                            <Info className="w-5 h-5 text-trust-500 flex-shrink-0 mt-0.5" />
-                            <div>
-                              <h3 className="text-sm font-semibold text-trust-700 mb-1">
-                                Contexto importante
-                              </h3>
-                              <p className="text-trust-600 text-sm leading-relaxed">
-                                {result.context}
-                              </p>
-                            </div>
+                          <div>
+                            <span className="text-sm font-medium block" style={{ color: 'rgba(255,255,255,0.8)' }}>
+                              Veredito
+                            </span>
+                            <span className="text-2xl font-bold" style={{ color: 'white' }}>
+                              {config.label}
+                            </span>
                           </div>
                         </div>
-                      )}
-
-                      {/* Sources */}
-                      {result.sources && result.sources.length > 0 && (
-                        <div>
-                          <h3 className={`text-sm font-semibold ${config.textColor} uppercase tracking-wide mb-2`}>
-                            Fontes consultadas
-                          </h3>
-                          <ul className="space-y-2">
-                            {result.sources.map((source, index) => (
-                              <li key={index} className="flex items-center gap-2 text-trust-600 text-sm">
-                                <ExternalLink className="w-4 h-4 flex-shrink-0" />
-                                <span>{source}</span>
-                              </li>
-                            ))}
-                          </ul>
+                        
+                        {/* Confidence */}
+                        <div className="text-right">
+                          <span className="text-sm block" style={{ color: 'rgba(255,255,255,0.8)' }}>Confiança</span>
+                          <span className="text-2xl font-bold" style={{ color: 'white' }}>
+                            {result.confianca}%
+                          </span>
                         </div>
-                      )}
-
-                      {/* Tips */}
-                      {result.tips && result.tips.length > 0 && (
-                        <div className="pt-4 border-t border-trust-200">
-                          <h3 className="text-sm font-semibold text-trust-700 mb-3 flex items-center gap-2">
-                            <Sparkles className="w-4 h-4" />
-                            Dicas para verificar você mesmo
-                          </h3>
-                          <ul className="space-y-2">
-                            {result.tips.map((tip, index) => (
-                              <li key={index} className="flex items-start gap-2 text-trust-600 text-sm">
-                                <ArrowRight className="w-4 h-4 flex-shrink-0 mt-0.5 text-trust-400" />
-                                <span>{tip}</span>
-                              </li>
-                            ))}
-                          </ul>
-                        </div>
-                      )}
+                      </div>
                     </div>
-                  </div>
-                )
-              })()}
-            </div>
-          )}
+                  )
+                })()}
 
-          {/* Tips Section */}
-          {!result && !isAnalyzing && (
-            <div className="mt-12 grid grid-cols-1 md:grid-cols-3 gap-4">
-              {[
-                {
-                  icon: LinkIcon,
-                  title: 'Links',
-                  description: 'Cole links de notícias ou posts para verificar'
-                },
-                {
-                  icon: FileText,
-                  title: 'Textos',
-                  description: 'Cole mensagens de WhatsApp ou textos suspeitos'
-                },
-                {
-                  icon: ImageIcon,
-                  title: 'Imagens',
-                  description: 'Envie prints de posts ou mensagens'
-                }
-              ].map((item, index) => (
-                <div 
-                  key={index}
-                  className="p-4 bg-white/60 backdrop-blur-sm rounded-xl border border-trust-100 text-center hover:bg-white hover:shadow-md transition-all"
-                >
-                  <div className="inline-flex items-center justify-center w-10 h-10 rounded-lg bg-trust-100 text-trust-600 mb-3">
-                    <item.icon className="w-5 h-5" />
-                  </div>
-                  <h3 className="font-semibold text-trust-800 mb-1">{item.title}</h3>
-                  <p className="text-trust-500 text-sm">{item.description}</p>
+                {/* Summary */}
+                <div className="p-6 border-b border-slate-100">
+                  <h3 className="font-semibold mb-2" style={{ color: '#1e293b' }}>Resumo</h3>
+                  <p className="leading-relaxed" style={{ color: '#475569' }}>{result.resumo}</p>
                 </div>
-              ))}
+
+                {/* Analysis */}
+                <div className="p-6 border-b border-slate-100">
+                  <h3 className="font-semibold mb-2" style={{ color: '#1e293b' }}>Análise</h3>
+                  <p className="leading-relaxed" style={{ color: '#475569' }}>{result.analise}</p>
+                </div>
+
+                {/* Tips */}
+                {result.dicas && (
+                  <div className={`p-6 border-b border-slate-100 ${veredictoConfig[result.veredito].bgLight}`}>
+                    <div className="flex items-start gap-3">
+                      <div className="w-8 h-8 rounded-lg bg-white flex items-center justify-center flex-shrink-0 shadow-sm">
+                        <Lightbulb className="w-4 h-4 text-amber-500" />
+                      </div>
+                      <div>
+                        <h3 className="font-semibold text-navy-800 mb-1">Dica</h3>
+                        <p className="text-slate-600 text-sm leading-relaxed">{result.dicas}</p>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* Legal Context */}
+                {result.contexto_juridico && (
+                  <div className="p-6 border-b border-slate-100 bg-slate-50">
+                    <div className="flex items-start gap-3">
+                      <div className="w-8 h-8 rounded-lg bg-white flex items-center justify-center flex-shrink-0 shadow-sm">
+                        <Scale className="w-4 h-4 text-navy-600" />
+                      </div>
+                      <div>
+                        <h3 className="font-semibold text-navy-800 mb-1">Contexto Jurídico</h3>
+                        <p className="text-slate-600 text-sm leading-relaxed">{result.contexto_juridico}</p>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* Sources */}
+                {result.fontes_consultadas && result.fontes_consultadas.length > 0 && (
+                  <div className="p-6">
+                    <h3 className="font-semibold text-navy-800 mb-3">Fontes de Referência</h3>
+                    <ul className="space-y-2">
+                      {result.fontes_consultadas.map((fonte, index) => (
+                        <li key={index} className="flex items-center gap-2 text-sm text-slate-600">
+                          <ExternalLink className="w-3.5 h-3.5 text-slate-400 flex-shrink-0" />
+                          <span>{fonte}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+
+                {/* Demo Mode Warning */}
+                {result.modo_demo && (
+                  <div className="p-4 bg-amber-50 border-t border-amber-200">
+                    <p className="text-sm text-amber-700 text-center">
+                      ⚠️ Modo demonstração. Configure a API key para verificações reais.
+                    </p>
+                  </div>
+                )}
+              </div>
+
+              {/* New Verification Button */}
+              <button
+                onClick={resetForm}
+                className="w-full py-4 px-6 bg-white hover:bg-slate-50 text-navy-800 font-semibold rounded-xl border-2 border-slate-200 hover:border-slate-300 transition-all flex items-center justify-center gap-2"
+              >
+                <Search className="w-5 h-5" />
+                Verificar outro conteúdo
+              </button>
             </div>
           )}
         </div>
-      </section>
+      </div>
 
       {/* Footer */}
-      <footer className="relative z-10 py-8 px-4 border-t border-trust-200/50">
-        <div className="max-w-2xl mx-auto text-center">
-          <p className="text-trust-500 text-sm">
-            Esta ferramenta usa IA para auxiliar na verificação de fatos. 
-            <span className="font-medium text-trust-600"> Sempre confirme informações importantes com fontes oficiais.</span>
-          </p>
-          <p className="text-trust-400 text-xs mt-2">
-            Powered by Claude AI • Desenvolvido para combater a desinformação
+      <footer className="w-full py-4 px-6 border-t border-slate-200 bg-white/50">
+        <div className="max-w-4xl mx-auto text-center">
+          <p className="text-xs text-slate-400">
+            Esta ferramenta usa inteligência artificial e pode cometer erros. 
+            Sempre verifique informações importantes em fontes oficiais.
           </p>
         </div>
       </footer>
