@@ -1,93 +1,26 @@
 import { NextRequest, NextResponse } from 'next/server'
 import Anthropic from '@anthropic-ai/sdk'
 
-// System prompt otimizado para verificação de fatos no contexto brasileiro
-const SYSTEM_PROMPT = `Você é um verificador de fatos especializado, treinado para analisar notícias, posts de redes sociais e mensagens de WhatsApp no contexto brasileiro e latino-americano.
+// System prompt otimizado para fact-checking
+const SYSTEM_PROMPT = `Você é um verificador de fatos. Analise a informação e responda APENAS com JSON válido neste formato exato:
 
-## Sua Missão
-Ajudar pessoas leigas a identificar desinformação de forma clara e acessível.
+{"veredito":"FALSO","confianca":95,"resumo":"Breve explicação","analise":"Análise detalhada","fontes_consultadas":["fonte1"],"dicas":"Dica para verificar","contexto_juridico":null}
 
-## Princípios de Análise
+Vereditos possíveis: VERDADEIRO, FALSO, ENGANOSO, SEM_EVIDENCIAS
+Confiança: número de 1 a 100
+contexto_juridico: string ou null
 
-### 1. Ceticismo Metodológico
-- Nunca assuma que algo é verdade porque parece plausível
-- Verifique datas - muitas fake news usam notícias antigas fora de contexto
-- Analise a origem da informação
-- Desconfie de conteúdo muito emocional ou alarmista
-
-### 2. Fontes Confiáveis (em ordem de preferência)
-- Agências de checagem: Lupa, Aos Fatos, Estadão Verifica, AFP Checamos
-- Fontes oficiais: sites .gov.br, tribunais superiores, órgãos reguladores
-- Veículos de referência: Folha, Estadão, O Globo, G1, BBC Brasil, Reuters
-- Dados públicos: IBGE, TSE, DataSUS, portais de transparência
-- Publicações científicas: SciELO, PubMed, revistas peer-reviewed
-
-### 3. Red Flags de Fake News
-- Ausência de fontes ou fontes vagas ("médicos dizem", "segundo estudos")
-- Erros ortográficos e formatação amadora
-- Tom extremamente emocional ou sensacionalista
-- Teorias da conspiração envolvendo "eles" ou grupos poderosos
-- Promessas milagrosas (curas, enriquecimento fácil)
-- Imagens descontextualizadas ou manipuladas
-- Pedidos de compartilhamento urgente
-- Ausência de data ou datas inconsistentes
-
-### 4. Contexto Jurídico e Regulatório
-Quando relevante, mencione:
-- Legislação aplicável (LGPD, Código de Defesa do Consumidor, etc.)
-- Decisões judiciais sobre o tema
-- Regulamentações de órgãos (Anvisa, Anatel, CVM, etc.)
-- Consequências legais de disseminar certas informações
-
-## Formato de Resposta
-Responda SEMPRE em JSON válido com esta estrutura:
-
-{
-  "verdict": "VERDADEIRO" | "FALSO" | "ENGANOSO" | "SEM_EVIDENCIAS",
-  "confidence": número de 0 a 100,
-  "summary": "Resumo em até 2 frases do veredito",
-  "explanation": "Explicação detalhada do porquê chegamos a esse veredito (2-4 frases)",
-  "context": "Contexto adicional relevante (jurídico, técnico, histórico) se houver",
-  "sources": ["Lista de fontes ou tipos de fontes consultadas"],
-  "tips": ["Dicas práticas para o usuário verificar por conta própria"]
-}
-
-## Critérios para cada Veredito
-
-**VERDADEIRO**: A informação é factualmente correta, verificável em múltiplas fontes confiáveis, e não há distorção de contexto.
-
-**FALSO**: A informação é factualmente incorreta, contradiz evidências verificáveis, ou é uma fabricação completa.
-
-**ENGANOSO**: A informação contém elementos verdadeiros mas distorce a realidade através de:
-- Omissão de contexto importante
-- Exagero de fatos
-- Apresentação fora de cronologia
-- Manipulação de imagens/dados
-- Correlações falsas
-
-**SEM_EVIDENCIAS**: Não há informações suficientes para confirmar ou negar. A alegação pode ser não verificável ou sobre eventos futuros.
-
-## Regras Importantes
-1. Seja DIRETO - pessoas leigas precisam de respostas claras
-2. Use linguagem SIMPLES - evite jargões
-3. NUNCA invente fontes ou informações
-4. Se não souber, diga "SEM_EVIDENCIAS"
-5. Considere o contexto brasileiro atual
-6. Analise o CONTEÚDO, não quem compartilhou
-7. Se for uma imagem, descreva o que você vê antes de analisar
-
-Lembre-se: seu objetivo é EDUCAR e EMPODERAR o usuário a pensar criticamente, não apenas dar um veredito.`
+IMPORTANTE: Responda SOMENTE o JSON, sem texto antes ou depois, sem markdown.`
 
 export async function POST(request: NextRequest) {
   try {
     const formData = await request.formData()
-    const text = formData.get('text') as string
-    const type = formData.get('type') as string
+    const text = formData.get('text') as string | null
     const imageFile = formData.get('image') as File | null
 
-    if (!text?.trim() && !imageFile) {
+    if (!text && !imageFile) {
       return NextResponse.json(
-        { error: 'Envie um texto, link ou imagem para verificar' },
+        { error: 'Envie um texto, link ou imagem para verificar.' },
         { status: 400 }
       )
     }
@@ -95,27 +28,33 @@ export async function POST(request: NextRequest) {
     // Verificar se a API key está configurada
     const apiKey = process.env.ANTHROPIC_API_KEY
     if (!apiKey) {
-      console.error('ANTHROPIC_API_KEY não configurada')
-      return NextResponse.json(
-        { error: 'Serviço temporariamente indisponível. Configure a API key.' },
-        { status: 503 }
-      )
+      return NextResponse.json({
+        veredito: 'SEM_EVIDENCIAS',
+        confianca: 0,
+        resumo: 'API não configurada.',
+        analise: 'Configure a variável ANTHROPIC_API_KEY para usar o verificador.',
+        fontes_consultadas: [],
+        dicas: 'Configure a API key nas configurações do projeto na Vercel.',
+        contexto_juridico: null,
+      })
     }
 
-    const client = new Anthropic({
-      apiKey: apiKey,
-    })
+    const client = new Anthropic({ apiKey })
 
-    // Preparar o conteúdo da mensagem
-    const messageContent: Anthropic.MessageCreateParams['messages'][0]['content'] = []
+    // Preparar conteúdo para a API
+    const content: Anthropic.MessageParam['content'] = []
 
-    // Se houver imagem, processar e adicionar
+    // Se houver imagem, processar primeiro
     if (imageFile) {
       const bytes = await imageFile.arrayBuffer()
       const base64 = Buffer.from(bytes).toString('base64')
-      const mediaType = imageFile.type as 'image/jpeg' | 'image/png' | 'image/gif' | 'image/webp'
       
-      messageContent.push({
+      let mediaType: 'image/jpeg' | 'image/png' | 'image/gif' | 'image/webp' = 'image/jpeg'
+      if (imageFile.type === 'image/png') mediaType = 'image/png'
+      else if (imageFile.type === 'image/gif') mediaType = 'image/gif'
+      else if (imageFile.type === 'image/webp') mediaType = 'image/webp'
+
+      content.push({
         type: 'image',
         source: {
           type: 'base64',
@@ -125,65 +64,74 @@ export async function POST(request: NextRequest) {
       })
     }
 
-    // Construir o prompt do usuário
-    let userPrompt = ''
-    if (type === 'url' && text) {
-      userPrompt = `Analise esta URL e verifique se o conteúdo é confiável:\n\n${text}`
-    } else if (text) {
-      userPrompt = `Analise o seguinte conteúdo e verifique se é verdadeiro ou fake news:\n\n"""${text}"""`
-    }
+    // Adicionar texto
+    const userMessage = text 
+      ? `Verifique: "${text}"`
+      : 'Verifique o conteúdo desta imagem.'
 
-    if (imageFile) {
-      userPrompt += userPrompt 
-        ? '\n\nAnalise também a imagem anexada junto com o texto acima.' 
-        : 'Analise a imagem anexada e verifique se o conteúdo é verdadeiro ou desinformação.'
-    }
-
-    messageContent.push({
+    content.push({
       type: 'text',
-      text: userPrompt,
+      text: userMessage,
     })
 
-    // Chamar a API do Claude
+    // Fazer chamada para a API
     const response = await client.messages.create({
       model: 'claude-sonnet-4-20250514',
-      max_tokens: 2048,
+      max_tokens: 1024,
       system: SYSTEM_PROMPT,
       messages: [
         {
           role: 'user',
-          content: messageContent,
+          content: content,
         },
       ],
     })
 
-    // Extrair o texto da resposta
-    const responseText = response.content
-      .filter((block): block is Anthropic.TextBlock => block.type === 'text')
-      .map((block) => block.text)
-      .join('')
+    // Extrair resposta
+    const assistantMessage = response.content[0]
+    if (assistantMessage.type !== 'text') {
+      throw new Error('Resposta inválida da API')
+    }
 
-    // Parse do JSON (com tratamento de erro)
+    // Parsear JSON da resposta
     let result
     try {
-      // Tentar extrair JSON mesmo se houver texto adicional
-      const jsonMatch = responseText.match(/\{[\s\S]*\}/)
-      if (jsonMatch) {
-        result = JSON.parse(jsonMatch[0])
-      } else {
-        throw new Error('Resposta não contém JSON válido')
+      let jsonText = assistantMessage.text.trim()
+      
+      // Remover possíveis markdown code blocks
+      jsonText = jsonText.replace(/```json\s*/g, '').replace(/```\s*/g, '')
+      
+      // Tentar encontrar o JSON na resposta
+      const jsonStart = jsonText.indexOf('{')
+      const jsonEnd = jsonText.lastIndexOf('}')
+      if (jsonStart !== -1 && jsonEnd !== -1) {
+        jsonText = jsonText.substring(jsonStart, jsonEnd + 1)
       }
-    } catch {
-      console.error('Erro ao parsear resposta:', responseText)
-      // Retornar resposta estruturada mesmo em caso de erro de parse
+      
+      result = JSON.parse(jsonText)
+      
+      // Validar campos obrigatórios
+      if (!result.veredito || !['VERDADEIRO', 'FALSO', 'ENGANOSO', 'SEM_EVIDENCIAS'].includes(result.veredito)) {
+        result.veredito = 'SEM_EVIDENCIAS'
+      }
+      if (typeof result.confianca !== 'number') {
+        result.confianca = 50
+      }
+      if (!result.resumo) result.resumo = 'Análise realizada.'
+      if (!result.analise) result.analise = assistantMessage.text
+      if (!result.fontes_consultadas) result.fontes_consultadas = []
+      if (!result.dicas) result.dicas = 'Verifique sempre em fontes oficiais.'
+      
+    } catch (parseError) {
+      // Se falhar o parse, criar resposta estruturada com o texto original
       result = {
-        verdict: 'SEM_EVIDENCIAS',
-        confidence: 0,
-        summary: 'Não foi possível analisar este conteúdo adequadamente.',
-        explanation: 'Houve um erro no processamento. Tente novamente ou reformule sua consulta.',
-        context: null,
-        sources: [],
-        tips: ['Tente enviar o texto de forma mais clara', 'Se for uma imagem, certifique-se de que está legível'],
+        veredito: 'SEM_EVIDENCIAS',
+        confianca: 50,
+        resumo: 'Análise realizada mas formato de resposta inesperado.',
+        analise: assistantMessage.text.substring(0, 500),
+        fontes_consultadas: [],
+        dicas: 'Tente novamente ou reformule a pergunta.',
+        contexto_juridico: null,
       }
     }
 
@@ -192,25 +140,17 @@ export async function POST(request: NextRequest) {
   } catch (error) {
     console.error('Erro na verificação:', error)
     
-    // Tratamento específico de erros
-    if (error instanceof Anthropic.APIError) {
-      if (error.status === 401) {
-        return NextResponse.json(
-          { error: 'Erro de autenticação. Verifique a API key.' },
-          { status: 401 }
-        )
-      }
-      if (error.status === 429) {
-        return NextResponse.json(
-          { error: 'Muitas requisições. Aguarde um momento e tente novamente.' },
-          { status: 429 }
-        )
-      }
-    }
-
-    return NextResponse.json(
-      { error: 'Erro ao processar sua solicitação. Tente novamente.' },
-      { status: 500 }
-    )
+    const errorMessage = error instanceof Error ? error.message : 'Erro desconhecido'
+    
+    // Retornar resultado estruturado mesmo em caso de erro
+    return NextResponse.json({
+      veredito: 'SEM_EVIDENCIAS',
+      confianca: 0,
+      resumo: 'Erro ao processar. Tente novamente.',
+      analise: `Erro técnico: ${errorMessage}`,
+      fontes_consultadas: [],
+      dicas: 'Se o erro persistir, tente mais tarde.',
+      contexto_juridico: null,
+    })
   }
 }
