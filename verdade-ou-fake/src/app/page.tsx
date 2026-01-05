@@ -37,7 +37,7 @@ const veredictoConfig = {
   VERDADEIRO: {
     icon: CheckCircle2,
     label: 'Verdadeiro',
-    className: 'verdict-true',
+    bgColor: '#059669',
     textColor: 'text-emerald-700',
     bgLight: 'bg-emerald-50',
     borderColor: 'border-emerald-200',
@@ -45,7 +45,7 @@ const veredictoConfig = {
   FALSO: {
     icon: XCircle,
     label: 'Falso',
-    className: 'verdict-false',
+    bgColor: '#dc2626',
     textColor: 'text-red-700',
     bgLight: 'bg-red-50',
     borderColor: 'border-red-200',
@@ -53,7 +53,7 @@ const veredictoConfig = {
   ENGANOSO: {
     icon: AlertTriangle,
     label: 'Enganoso',
-    className: 'verdict-misleading',
+    bgColor: '#d97706',
     textColor: 'text-amber-700',
     bgLight: 'bg-amber-50',
     borderColor: 'border-amber-200',
@@ -61,7 +61,7 @@ const veredictoConfig = {
   SEM_EVIDENCIAS: {
     icon: HelpCircle,
     label: 'Sem Evidências',
-    className: 'verdict-unverified',
+    bgColor: '#6b7280',
     textColor: 'text-gray-700',
     bgLight: 'bg-gray-50',
     borderColor: 'border-gray-200',
@@ -306,23 +306,27 @@ export default function Home() {
               <button
                 type="submit"
                 disabled={isLoading || (!text.trim() && !image)}
-                className="w-full py-4 px-6 bg-slate-800 hover:bg-slate-700 text-white font-semibold rounded-xl shadow-lg shadow-slate-900/20 disabled:opacity-50 disabled:cursor-not-allowed transition-all flex items-center justify-center gap-3"
+                className="w-full py-4 px-6 font-semibold rounded-xl shadow-lg disabled:opacity-50 disabled:cursor-not-allowed transition-all flex items-center justify-center gap-3"
+                style={{ 
+                  backgroundColor: '#1e293b', 
+                  color: 'white',
+                }}
               >
                 {isLoading ? (
                   <>
-                    <Loader2 className="w-5 h-5 animate-spin" />
-                    <span>Analisando...</span>
+                    <Loader2 className="w-5 h-5 animate-spin" style={{ color: 'white' }} />
+                    <span style={{ color: 'white' }}>Analisando...</span>
                   </>
                 ) : (
                   <>
-                    <Search className="w-5 h-5" />
-                    <span>Verificar Fato</span>
+                    <Search className="w-5 h-5" style={{ color: 'white' }} />
+                    <span style={{ color: 'white' }}>Verificar Fato</span>
                   </>
                 )}
               </button>
 
               {/* Helper text */}
-              <p className="text-center text-xs text-slate-400">
+              <p className="text-center text-xs" style={{ color: '#94a3b8' }}>
                 Esta ferramenta usa IA para análise. Sempre verifique em fontes oficiais.
               </p>
             </form>
@@ -338,17 +342,23 @@ export default function Home() {
                   const config = veredictoConfig[result.veredito]
                   const Icon = config.icon
                   return (
-                    <div className={`p-6 ${config.className}`}>
+                    <div 
+                      className="p-6"
+                      style={{ backgroundColor: config.bgColor }}
+                    >
                       <div className="flex items-center justify-between">
                         <div className="flex items-center gap-4">
-                          <div className="w-14 h-14 rounded-2xl bg-white/20 flex items-center justify-center">
-                            <Icon className="w-7 h-7 text-white" />
+                          <div 
+                            className="w-14 h-14 rounded-2xl flex items-center justify-center"
+                            style={{ backgroundColor: 'rgba(255,255,255,0.2)' }}
+                          >
+                            <Icon className="w-7 h-7" style={{ color: 'white' }} />
                           </div>
                           <div>
-                            <span className="text-sm font-medium text-white/80 block">
+                            <span className="text-sm font-medium block" style={{ color: 'rgba(255,255,255,0.8)' }}>
                               Veredito
                             </span>
-                            <span className="text-2xl font-bold text-white">
+                            <span className="text-2xl font-bold" style={{ color: 'white' }}>
                               {config.label}
                             </span>
                           </div>
@@ -356,8 +366,8 @@ export default function Home() {
                         
                         {/* Confidence */}
                         <div className="text-right">
-                          <span className="text-sm text-white/80 block">Confiança</span>
-                          <span className="text-2xl font-bold text-white">
+                          <span className="text-sm block" style={{ color: 'rgba(255,255,255,0.8)' }}>Confiança</span>
+                          <span className="text-2xl font-bold" style={{ color: 'white' }}>
                             {result.confianca}%
                           </span>
                         </div>
@@ -368,14 +378,14 @@ export default function Home() {
 
                 {/* Summary */}
                 <div className="p-6 border-b border-slate-100">
-                  <h3 className="font-semibold text-navy-800 mb-2">Resumo</h3>
-                  <p className="text-slate-600 leading-relaxed">{result.resumo}</p>
+                  <h3 className="font-semibold mb-2" style={{ color: '#1e293b' }}>Resumo</h3>
+                  <p className="leading-relaxed" style={{ color: '#475569' }}>{result.resumo}</p>
                 </div>
 
                 {/* Analysis */}
                 <div className="p-6 border-b border-slate-100">
-                  <h3 className="font-semibold text-navy-800 mb-2">Análise</h3>
-                  <p className="text-slate-600 leading-relaxed">{result.analise}</p>
+                  <h3 className="font-semibold mb-2" style={{ color: '#1e293b' }}>Análise</h3>
+                  <p className="leading-relaxed" style={{ color: '#475569' }}>{result.analise}</p>
                 </div>
 
                 {/* Tips */}
